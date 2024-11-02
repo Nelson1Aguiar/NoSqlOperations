@@ -39,7 +39,7 @@ namespace NoSqlOperations.Connector
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Erro de conexão: " + ex.Message);
+                Logger.SaveLog(ex.Message);
                 return null;
             }
         }

@@ -10,10 +10,10 @@ namespace NoSqlOperations.Interfaces
 {
     public interface IMongoOperations
     {
-        public Task InsertInMongoAsync<T>(T entity, string collectionName);
-        public List<T> GetInMongo<T>(FilterDefinition<T> filter, string collectionName);
-        public Task UpdateInMongo<T>(FilterDefinition<T> filter, string collectionName, T updateDocument, params Expression<Func<T, object>>[] propertiesToUpdate);
-        public Task DeleteInMongo<T>(FilterDefinition<T> filter, string collectionName);
+        public void InsertInMongoAsync<T>(T entity, string collectionName);
+        public List<T>? GetInMongo<T>(FilterDefinition<T> filter, string collectionName);
+        public void UpdateInMongoAsync<T>(FilterDefinition<T> filter, string collectionName, T updateDocument, params Expression<Func<T, object>>[] propertiesToUpdate);
+        public void DeleteInMongoAsync<T>(FilterDefinition<T> filter, string collectionName);
 
     }
 }

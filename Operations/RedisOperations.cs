@@ -15,9 +15,8 @@ namespace NoSqlOperations.Operations
         public RedisOperations(IConnectionNoSql connectionNoSql)
         {
             _connectionNoSql = connectionNoSql;
-            _dataBase = ConnectionNoSqlProvider.GetConnection(ConnectionTypeNoSql.RedisConnection, _connectionNoSql);
+            _dataBase = _connectionNoSql.GenerateConnection(ConnectionTypeNoSql.RedisConnection);
         }
-
 
         public void SetData<T>(T entity, string redisKey)
         {
@@ -28,14 +27,14 @@ namespace NoSqlOperations.Operations
                     string jsonEntity = JsonConvert.SerializeObject(entity);
                     _dataBase.StringSet(redisKey, jsonEntity);
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Console.WriteLine(e.ToString());
+                    Logger.SaveLog(ex.Message);
                 }
             }
         }
 
-        public T? GetOneData<T>(string redisKey) where T : class
+        public T? GetData<T>(string redisKey) where T : class
         {
             if (_dataBase != null)
             {
@@ -47,14 +46,14 @@ namespace NoSqlOperations.Operations
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.ToString());
+                    Logger.SaveLog(ex.Message);
                     return null;
                 }
             }
             return null;
         }
 
-        public List<T> GetAllDataByUserId<T>(string redisKey)
+        public List<T>? GetAllDataByKey<T>(string redisKey)
         {
             List<T> entities = new List<T>();
 
@@ -79,7 +78,7 @@ namespace NoSqlOperations.Operations
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex.ToString());
+                    Logger.SaveLog(ex.Message);
                     return null;
                 }
             }

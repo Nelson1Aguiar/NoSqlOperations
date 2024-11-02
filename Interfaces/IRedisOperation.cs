@@ -10,7 +10,7 @@ namespace NoSqlOperations.Interfaces
     public interface IRedisOperation
     {
         public void SetData<T>(T entity, string redisKey);
-        public T? GetOneData<T>(string redisKey) where T : class;
-        public List<T> GetAllDataByUserId<T>(string redisKey);
+        public T? GetData<T>(string redisKey) where T : class;
+        public List<T>? GetAllDataByKey<T>(string redisKey);
     }
 }
