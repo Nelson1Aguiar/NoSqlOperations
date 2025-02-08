@@ -150,3 +150,7 @@ Exemplos para uso de métodos do Redis:
 ## Contribuição
 
 Sinta-se à vontade para abrir issues e pull requests para melhorias na biblioteca.
+
+##Licença
+
+Este projeto está licenciado sob a MIT License - veja o arquivo LICENSE para mais detalhes.
