@@ -146,3 +146,7 @@ Exemplos para uso de métodos do Redis:
     }
 
 ```
+
+## Contribuição
+
+Sinta-se à vontade para abrir issues e pull requests para melhorias na biblioteca.
