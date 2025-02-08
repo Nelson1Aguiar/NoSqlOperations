@@ -1,19 +1,16 @@
-﻿using MongoDB.Driver;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Linq.Expressions;
 
 namespace NoSqlOperations.Interfaces
 {
     public interface IMongoOperations
     {
-        public void InsertInMongoAsync<T>(T entity, string collectionName);
-        public List<T>? GetInMongo<T>(FilterDefinition<T> filter, string collectionName);
-        public void UpdateInMongoAsync<T>(FilterDefinition<T> filter, string collectionName, T updateDocument, params Expression<Func<T, object>>[] propertiesToUpdate);
-        public void DeleteInMongoAsync<T>(FilterDefinition<T> filter, string collectionName);
+        public Task InsertInMongoAsync<T>(T entity, string collectionName);
+        public Task<List<T>> GetListInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName);
+        public List<T> GetListInMongo<T>(Expression<Func<T, bool>> filterExpression, string collectionName);
+        public Task<T> GetInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName) where T : class, new();
+        public T GetInMongo<T>(Expression<Func<T, bool>> filterExpression, string collectionName) where T : class, new();
+        public Task UpdateInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName, T updateDocument);
+        public Task DeleteInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName);
 
     }
 }

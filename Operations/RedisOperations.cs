@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using NoSqlOperations.Connector;
 using NoSqlOperations.Enum;
 using NoSqlOperations.Interfaces;
@@ -9,10 +8,10 @@ namespace NoSqlOperations.Operations
 {
     public class RedisOperations : IRedisOperation
     {
-        private IDatabase _dataBase;
-        private readonly IConnectionNoSql _connectionNoSql;
+        private IDatabase? _dataBase;
+        private readonly IConnectionRedis _connectionNoSql;
 
-        public RedisOperations(IConnectionNoSql connectionNoSql)
+        public RedisOperations(IConnectionRedis connectionNoSql)
         {
             _connectionNoSql = connectionNoSql;
             _dataBase = _connectionNoSql.GenerateConnection(ConnectionTypeNoSql.RedisConnection);
@@ -34,7 +33,7 @@ namespace NoSqlOperations.Operations
             }
         }
 
-        public T? GetData<T>(string redisKey) where T : class
+        public T GetData<T>(string redisKey) where T : class, new()
         {
             if (_dataBase != null)
             {
@@ -47,13 +46,13 @@ namespace NoSqlOperations.Operations
                 catch (Exception ex)
                 {
                     Logger.SaveLog(ex.Message);
-                    return null;
+                    return new T();
                 }
             }
-            return null;
+            return new T();
         }
 
-        public List<T>? GetAllDataByKey<T>(string redisKey)
+        public List<T> GetAllDataByKey<T>(string redisKey)
         {
             List<T> entities = new List<T>();
 
@@ -64,9 +63,9 @@ namespace NoSqlOperations.Operations
                     string pattern = $"*{redisKey}*";
                     string serverName = _dataBase.Multiplexer.Configuration;
                     string formatServerName = FormatServerName(serverName);
-                    var server = _dataBase.Multiplexer.GetServer(formatServerName);
-                    var keys = server.Keys(pattern: pattern);
-                    foreach (var key in keys)
+                    IServer server = _dataBase.Multiplexer.GetServer(formatServerName);
+                    IEnumerable<RedisKey> keys = server.Keys(pattern: pattern);
+                    foreach (RedisKey key in keys)
                     {
                         string jsonEntity = _dataBase.StringGet(key);
                         if (jsonEntity != null)
@@ -79,10 +78,10 @@ namespace NoSqlOperations.Operations
                 catch (Exception ex)
                 {
                     Logger.SaveLog(ex.Message);
-                    return null;
+                    return entities;
                 }
             }
-            return null;
+            return entities;
         }
 
         private string FormatServerName(string server)
