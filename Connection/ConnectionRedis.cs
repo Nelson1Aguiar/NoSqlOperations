@@ -3,40 +3,41 @@ using NoSqlOperations.Enum;
 using NoSqlOperations.Interfaces;
 using StackExchange.Redis;
 
-namespace NoSqlOperations.Connector
+public class ConnectionRedis : IConnectionRedis
 {
-    public class ConnectionRedis : IConnectionRedis
+    private readonly IConfiguration _configuration;
+    private static readonly object _lock = new();
+    private static ConnectionMultiplexer? _connectionMultiplexer;
+
+    public ConnectionRedis(IConfiguration configuration)
     {
-        private readonly IConfiguration _configuration;
+        _configuration = configuration;
+    }
 
-        public ConnectionRedis(IConfiguration configuration)
+    public IDatabase? GenerateConnection(ConnectionTypeNoSql connectionType)
+    {
+        try
         {
-            _configuration = configuration;
-        }
+            string keyName = connectionType.ToString();
+            string connectionString = _configuration.GetConnectionString(keyName);
 
-        public IDatabase? GenerateConnection(ConnectionTypeNoSql connectionType)
-        {
-            try
+            if (_connectionMultiplexer == null || !_connectionMultiplexer.IsConnected)
             {
-                string keyName = connectionType.ToString();
-                string connectionString = _configuration.GetConnectionString(keyName);
+                lock (_lock)
+                {
+                    if (_connectionMultiplexer == null || !_connectionMultiplexer.IsConnected)
+                    {
+                        _connectionMultiplexer = ConnectionMultiplexer.Connect(connectionString);
+                    }
+                }
+            }
 
-                IDatabase? connection = ConnectionRedisProvider(connectionString);
-                return connection;
-            }
-            catch (Exception ex)
-            {
-                Logger.SaveLog(ex.Message);
-                return null;
-            }
+            return _connectionMultiplexer.GetDatabase();
         }
-
-        private IDatabase? ConnectionRedisProvider(string connectionString)
+        catch (Exception ex)
         {
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect(connectionString);
-            IDatabase? db = redis.GetDatabase();
-
-            return db;
+            Logger.SaveLog(ex.Message);
+            return null;
         }
     }
 }

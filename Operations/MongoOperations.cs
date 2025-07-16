@@ -8,45 +8,42 @@ namespace NoSqlOperations.Operations
 {
     public class MongoOperations : IMongoOperations
     {
-        private readonly MongoClient? _connectionMongoClient;
-        private readonly IConnectionMongoDB _connectionNoSql;
-        private readonly string? _mongoDataBaseName;
-        private readonly IMongoDatabase? _mongoDatabase;
+        private readonly IConnectionMongoDB _connectionMongoDB;
 
         public MongoOperations(IConnectionMongoDB connectionMongoDB)
         {
-            _connectionNoSql = connectionMongoDB;
-            _connectionMongoClient = _connectionNoSql.GenerateConnection(ConnectionTypeNoSql.MongoConnection);
-            _mongoDataBaseName = _connectionNoSql.GetDataBase(ConnectionTypeNoSql.MongoDataBaseConnection);
-            _mongoDatabase = _connectionMongoClient.GetDatabase(_mongoDataBaseName);
+            _connectionMongoDB = connectionMongoDB;
+        }
+
+        private IMongoDatabase GetDatabase()
+        {
+            MongoClient client = _connectionMongoDB.GenerateConnection(ConnectionTypeNoSql.MongoConnection);
+            string dbName = _connectionMongoDB.GetDataBase(ConnectionTypeNoSql.MongoDataBaseConnection);
+            return client?.GetDatabase(dbName) ?? throw new Exception("MongoDB connection failed.");
         }
 
         public async Task InsertInMongoAsync<T>(T entity, string collectionName)
         {
-            if (_connectionMongoClient != null)
+            try
             {
-                try
-                {
-                    IMongoCollection<BsonDocument> collection = _mongoDatabase.GetCollection<BsonDocument>(collectionName);
-                    BsonDocument document = entity.ToBsonDocument();
-                    await collection.InsertOneAsync(document);
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                }
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<BsonDocument> collection = db.GetCollection<BsonDocument>(collectionName);
+                BsonDocument document = entity.ToBsonDocument();
+                await collection.InsertOneAsync(document);
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
             }
         }
 
         public async Task<List<T>> GetListInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName)
         {
-            if (_connectionMongoClient == null)
-                return new List<T>();
-
             try
             {
-                IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
                 return await collection.Find(filter)
                                        .Project<T>(Builders<T>.Projection.Exclude("_id"))
                                        .ToListAsync();
@@ -60,16 +57,14 @@ namespace NoSqlOperations.Operations
 
         public async Task<T> GetInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName) where T : class, new()
         {
-            if (_connectionMongoClient == null)
-                return new T();
-
             try
             {
-                IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
                 return await collection.Find(filter)
                                        .Project<T>(Builders<T>.Projection.Exclude("_id"))
-                                       .FirstAsync();
+                                       .FirstOrDefaultAsync() ?? new T();
             }
             catch (Exception ex)
             {
@@ -80,13 +75,11 @@ namespace NoSqlOperations.Operations
 
         public List<T> GetListInMongo<T>(Expression<Func<T, bool>> filterExpression, string collectionName)
         {
-            if (_connectionMongoClient == null)
-                return new List<T>();
-
             try
             {
-                IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
                 return collection.Find(filter)
                                  .Project<T>(Builders<T>.Projection.Exclude("_id"))
                                  .ToList();
@@ -100,16 +93,14 @@ namespace NoSqlOperations.Operations
 
         public T GetInMongo<T>(Expression<Func<T, bool>> filterExpression, string collectionName) where T : class, new()
         {
-            if (_connectionMongoClient == null)
-                new T();
-
             try
             {
-                IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
                 return collection.Find(filter)
                                  .Project<T>(Builders<T>.Projection.Exclude("_id"))
-                                 .First();
+                                 .FirstOrDefault() ?? new T();
             }
             catch (Exception ex)
             {
@@ -120,44 +111,40 @@ namespace NoSqlOperations.Operations
 
         public async Task UpdateInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName, T updateDocument)
         {
-            if (_connectionMongoClient != null)
+            try
             {
-                try
-                {
-                    IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                    FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
-                    var updateDefinitionList = typeof(T).GetProperties()
-                                                        .Where(prop => prop.GetValue(updateDocument) != null &&
-                                                        !(prop.PropertyType == typeof(string) && string.IsNullOrEmpty((string)prop.GetValue(updateDocument))))
-                                                        .Select(prop => Builders<T>.Update.Set(prop.Name, prop.GetValue(updateDocument)))
-                                                        .ToArray();
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
 
+                var updateDefinitionList = typeof(T).GetProperties()
+                    .Where(prop => prop.GetValue(updateDocument) != null &&
+                                  !(prop.PropertyType == typeof(string) && string.IsNullOrEmpty((string)prop.GetValue(updateDocument))))
+                    .Select(prop => Builders<T>.Update.Set(prop.Name, prop.GetValue(updateDocument)))
+                    .ToArray();
 
-                    UpdateDefinition<T> update = Builders<T>.Update.Combine(updateDefinitionList);
-                    UpdateResult result = await collection.UpdateManyAsync(filter, update);
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                }
+                var update = Builders<T>.Update.Combine(updateDefinitionList);
+                await collection.UpdateManyAsync(filter, update);
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
             }
         }
 
 
         public async Task DeleteInMongoAsync<T>(Expression<Func<T, bool>> filterExpression, string collectionName)
         {
-            if (_connectionMongoClient != null)
+            try
             {
-                try
-                {
-                    IMongoCollection<T> collection = _mongoDatabase.GetCollection<T>(collectionName);
-                    FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
-                    DeleteResult result = await collection.DeleteManyAsync(filter);
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                }
+                IMongoDatabase db = GetDatabase();
+                IMongoCollection<T> collection = db.GetCollection<T>(collectionName);
+                var filter = Builders<T>.Filter.Where(filterExpression);
+                await collection.DeleteManyAsync(filter);
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
             }
         }
     }

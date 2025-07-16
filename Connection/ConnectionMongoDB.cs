@@ -3,46 +3,54 @@ using MongoDB.Driver;
 using NoSqlOperations.Enum;
 using NoSqlOperations.Interfaces;
 
-namespace NoSqlOperations.Connection
+public class ConnectionMongoDB : IConnectionMongoDB
 {
-    public class ConnectionMongoDB : IConnectionMongoDB
+    private readonly IConfiguration _configuration;
+    private static readonly object _lock = new();
+    private static MongoClient? _mongoClient;
+
+    public ConnectionMongoDB(IConfiguration configuration)
     {
-        private readonly IConfiguration _configuration;
+        _configuration = configuration;
+    }
 
-        public ConnectionMongoDB(IConfiguration configuration)
+    public MongoClient? GenerateConnection(ConnectionTypeNoSql connectionType)
+    {
+        try
         {
-            _configuration = configuration;
+            if (_mongoClient == null)
+            {
+                lock (_lock)
+                {
+                    if (_mongoClient == null)
+                    {
+                        string keyName = connectionType.ToString();
+                        string connectionString = _configuration.GetConnectionString(keyName);
+                        _mongoClient = new MongoClient(connectionString);
+                    }
+                }
+            }
+
+            return _mongoClient;
         }
-
-        public MongoClient? GenerateConnection(ConnectionTypeNoSql connectionType)
+        catch (Exception ex)
         {
-            try
-            {
-                string keyName = connectionType.ToString();
-                string connectionString = _configuration.GetConnectionString(keyName);
-                MongoClient? connection = new MongoClient(connectionString);
-                return connection;
-            }
-            catch (Exception ex)
-            {
-                Logger.SaveLog(ex.Message);
-                return null;
-            }
+            Logger.SaveLog(ex.Message);
+            return null;
         }
+    }
 
-        public string GetDataBase(ConnectionTypeNoSql connectionType)
+    public string GetDataBase(ConnectionTypeNoSql connectionType)
+    {
+        try
         {
-            try
-            {
-                string keyName = connectionType.ToString();
-                string dataBase = _configuration.GetConnectionString(keyName);
-                return dataBase;
-            }
-            catch (Exception ex)
-            {
-                Logger.SaveLog(ex.Message);
-                return string.Empty;
-            }
+            string keyName = connectionType.ToString();
+            return _configuration.GetConnectionString(keyName);
+        }
+        catch (Exception ex)
+        {
+            Logger.SaveLog(ex.Message);
+            return string.Empty;
         }
     }
 }

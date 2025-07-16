@@ -7,130 +7,115 @@ namespace NoSqlOperations.Operations
 {
     public class RedisOperations : IRedisOperation
     {
-        private IDatabase? _dataBase;
         private readonly IConnectionRedis _connectionNoSql;
 
         public RedisOperations(IConnectionRedis connectionNoSql)
         {
             _connectionNoSql = connectionNoSql;
-            _dataBase = _connectionNoSql.GenerateConnection(ConnectionTypeNoSql.RedisConnection);
+        }
+
+        private IDatabase GetDatabase()
+        {
+            return _connectionNoSql.GenerateConnection(ConnectionTypeNoSql.RedisConnection);
+        }
+
+        private IServer GetServer(IDatabase db)
+        {
+            string serverName = db.Multiplexer.Configuration;
+            string formattedServerName = FormatServerName(serverName);
+            return db.Multiplexer.GetServer(formattedServerName);
         }
 
         public void SetData<T>(T entity, string redisKey)
         {
-            if (_dataBase != null)
+            try
             {
-                try
-                {
-                    string jsonEntity = JsonConvert.SerializeObject(entity);
-                    _dataBase.StringSet(redisKey, jsonEntity);
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                }
+                IDatabase db = GetDatabase();
+                string jsonEntity = JsonConvert.SerializeObject(entity);
+                db.StringSet(redisKey, jsonEntity);
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
             }
         }
 
         public T GetData<T>(string redisKey) where T : class, new()
         {
-            if (_dataBase != null)
+            try
             {
-                try
-                {
-                    string JsonEntity = _dataBase.StringGet(redisKey);
-                    T entity = JsonConvert.DeserializeObject<T>(JsonEntity);
-                    return entity;
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                    return new T();
-                }
+                IDatabase db = GetDatabase();
+                string jsonEntity = db.StringGet(redisKey);
+                return string.IsNullOrEmpty(jsonEntity) ? new T() : JsonConvert.DeserializeObject<T>(jsonEntity);
             }
-            return new T();
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
+                return new T();
+            }
         }
 
         public List<T> GetAllDataByKeyPattern<T>(string redisKey)
         {
             List<T> entities = new List<T>();
 
-            if (_dataBase != null)
+            try
             {
-                try
+                IDatabase db = GetDatabase();
+                IServer server = GetServer(db);
+                IEnumerable<RedisKey> keys = server.Keys(pattern: $"*{redisKey}*");
+
+                foreach (RedisKey key in keys)
                 {
-                    string pattern = $"*{redisKey}*";
-                    string serverName = _dataBase.Multiplexer.Configuration;
-                    string formatServerName = FormatServerName(serverName);
-                    IServer server = _dataBase.Multiplexer.GetServer(formatServerName);
-                    IEnumerable<RedisKey> keys = server.Keys(pattern: pattern);
-                    foreach (RedisKey key in keys)
-                    {
-                        string jsonEntity = _dataBase.StringGet(key);
-                        if (jsonEntity != null)
-                        {
-                            entities.Add(JsonConvert.DeserializeObject<T>(jsonEntity));
-                        }
-                    }
-                    return entities;
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message);
-                    return entities;
+                    string jsonEntity = db.StringGet(key);
+                    if (!string.IsNullOrEmpty(jsonEntity))
+                        entities.Add(JsonConvert.DeserializeObject<T>(jsonEntity));
                 }
             }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message);
+            }
+
             return entities;
         }
 
         public void DeleteByKey(string redisKey)
         {
-            if (_dataBase != null)
+            try
             {
-                try
-                {
-                    _dataBase.KeyDelete(redisKey);
-                }
-                catch (Exception ex)
-                {
-                    Logger.SaveLog(ex.Message, "DeleteByKey");
-                }
+                IDatabase db = GetDatabase();
+                db.KeyDelete(redisKey);
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message, "DeleteByKey");
             }
         }
 
         public void DeleteAllByKeyPattern(string redisKey)
         {
-            if (_dataBase != null)
+            try
             {
-                try
-                {
-                    string pattern = $"*{redisKey}*";
-                    string serverName = _dataBase.Multiplexer.Configuration;
-                    string formattedServerName = FormatServerName(serverName);
-                    IServer server = _dataBase.Multiplexer.GetServer(formattedServerName);
+                IDatabase db = GetDatabase();
+                IServer server = GetServer(db);
+                IEnumerable<RedisKey> keys = server.Keys(pattern: $"*{redisKey}*");
 
-                    IEnumerable<RedisKey> keys = server.Keys(pattern: pattern);
-
-                    foreach (RedisKey key in keys)
-                    {
-                        _dataBase.KeyDelete(key);
-                    }
-                }
-                catch (Exception ex)
+                foreach (RedisKey key in keys)
                 {
-                    Logger.SaveLog(ex.Message, "DeleteAllByKeyPattern");
+                    db.KeyDelete(key);
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message, "DeleteAllByKeyPattern");
             }
         }
 
         private string FormatServerName(string server)
         {
             int commaIndex = server.IndexOf(',');
-            if (commaIndex >= 0)
-            {
-                return server.Substring(0, commaIndex);
-            }
-            return server;
+            return commaIndex >= 0 ? server.Substring(0, commaIndex) : server;
         }
     }
 }
