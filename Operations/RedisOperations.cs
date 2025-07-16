@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using NoSqlOperations.Connector;
 using NoSqlOperations.Enum;
 using NoSqlOperations.Interfaces;
 using StackExchange.Redis;
@@ -52,7 +51,7 @@ namespace NoSqlOperations.Operations
             return new T();
         }
 
-        public List<T> GetAllDataByKey<T>(string redisKey)
+        public List<T> GetAllDataByKeyPattern<T>(string redisKey)
         {
             List<T> entities = new List<T>();
 
@@ -82,6 +81,46 @@ namespace NoSqlOperations.Operations
                 }
             }
             return entities;
+        }
+
+        public void DeleteByKey(string redisKey)
+        {
+            if (_dataBase != null)
+            {
+                try
+                {
+                    _dataBase.KeyDelete(redisKey);
+                }
+                catch (Exception ex)
+                {
+                    Logger.SaveLog(ex.Message, "DeleteByKey");
+                }
+            }
+        }
+
+        public void DeleteAllByKeyPattern(string redisKey)
+        {
+            if (_dataBase != null)
+            {
+                try
+                {
+                    string pattern = $"*{redisKey}*";
+                    string serverName = _dataBase.Multiplexer.Configuration;
+                    string formattedServerName = FormatServerName(serverName);
+                    IServer server = _dataBase.Multiplexer.GetServer(formattedServerName);
+
+                    IEnumerable<RedisKey> keys = server.Keys(pattern: pattern);
+
+                    foreach (RedisKey key in keys)
+                    {
+                        _dataBase.KeyDelete(key);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.SaveLog(ex.Message, "DeleteAllByKeyPattern");
+                }
+            }
         }
 
         private string FormatServerName(string server)
