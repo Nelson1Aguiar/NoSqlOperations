@@ -73,6 +73,27 @@ namespace NoSqlOperations.Operations
             }
         }
 
+        public async Task<T> GetInMongoOrderedAsync<T>(Expression<Func<T, bool>> filterExpression, Expression<Func<T, object>> orderByDescending, string collectionName) where T : class, new()
+        {
+            try
+            {
+                IMongoCollection<T> collection = GetDatabase().GetCollection<T>(collectionName);
+                FilterDefinition<T> filter = Builders<T>.Filter.Where(filterExpression);
+
+                return await collection
+                    .Find(filter)
+                    .SortByDescending(orderByDescending)
+                    .Project<T>(Builders<T>.Projection.Exclude("_id"))
+                    .FirstOrDefaultAsync() ?? new T();
+            }
+            catch (Exception ex)
+            {
+                Logger.SaveLog(ex.Message, "GetInMongoOrderedAsync");
+                return new T();
+            }
+        }
+
+
         public List<T> GetListInMongo<T>(Expression<Func<T, bool>> filterExpression, string collectionName)
         {
             try
